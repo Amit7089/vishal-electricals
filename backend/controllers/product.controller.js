@@ -1,6 +1,6 @@
 
 import mongoose from "mongoose";
-import Product from "../models/Product";
+import Product from "../models/Product.js";
 
 // Escape special characters before creating a regular expression
 const escapeRegex = (value) =>
