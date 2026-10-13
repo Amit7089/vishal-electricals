@@ -1,7 +1,7 @@
 
 import mongoose from "mongoose";
 import Wishlist from "../models/wishlist.js";
-import Product from "../models/product.js";
+import Product from "../models/Product.js";
 
 export const getWishlist = async (req, res) => {
   try {
