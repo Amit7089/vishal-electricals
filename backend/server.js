@@ -13,7 +13,6 @@ import orderRoutes from "./routes/order.routes.js";
 import adminOrderRoutes from "./routes/adminOrder.routes.js";
 import myOrdersRoutes from "./routes/myOrders.routes.js";
 
-// New routes
 import wishlistRoutes from "./routes/wishlist.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
 
@@ -22,10 +21,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Allowed frontend origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://vishalelectricalsbamitha.com",
+  "https://www.vishalelectricalsbamitha.com",
+  "https://vishal-electricals.vercel.app",
+];
+
 // CORS configuration
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header, such as health checks
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn("CORS blocked origin:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -99,9 +114,7 @@ const startServer = async () => {
     await connectDB();
 
     app.listen(PORT, () => {
-      console.log(
-        `Vishal Electricals API running on port ${PORT}`
-      );
+      console.log(`Vishal Electricals API running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Failed to start server:", error.message);
