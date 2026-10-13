@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import Razorpay from "razorpay";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import Product from "../models/product.js";
+import Product from "../models/Product.js";
 import Order from "../models/order.model.js";
 
 const formatImage = (product) => {
