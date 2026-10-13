@@ -775,7 +775,7 @@ export default function Home() {
 
           <Link
             to="/shop"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-6 py-3.5 font-bold text-orange-600 transition hover:bg-orange-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue px-6 py-3.5 font-bold text-orange-600 transition hover:bg-orange-50"
           >
             Browse Products
             <ArrowRight size={18} />
