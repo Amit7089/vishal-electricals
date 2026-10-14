@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import WhatsAppSupport from "../components/common/WhatsAppSupport";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -146,6 +147,7 @@ function ProductCard({ product, index, isWishlisted, onWishlist, ratingInfo }) {
   const id = getId(product);
   const price = getPrice(product);
   const originalPrice = getOriginalPrice(product);
+
   const discount =
     originalPrice > price && originalPrice > 0
       ? Math.round(((originalPrice - price) / originalPrice) * 100)
@@ -195,7 +197,7 @@ function ProductCard({ product, index, isWishlisted, onWishlist, ratingInfo }) {
           </span>
         )}
 
-        {product?.featured && (
+        {(product?.featured || product?.isFeatured) && (
           <span className="absolute bottom-3 left-3 z-[2] rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-slate-700 shadow-sm">
             <Sparkles size={11} className="mr-1 inline text-orange-500" />
             Featured
@@ -224,7 +226,6 @@ function ProductCard({ product, index, isWishlisted, onWishlist, ratingInfo }) {
         )}
       </div>
 
-      {/* flex-grow details + mt-auto button keeps the button at the bottom */}
       <div className="flex flex-1 flex-col p-4 pt-3">
         <p className="mb-1.5 line-clamp-1 text-[10px] font-extrabold uppercase tracking-[0.15em] text-orange-500">
           {product?.brand || product?.category || "Vishal Electricals"}
@@ -253,7 +254,6 @@ function ProductCard({ product, index, isWishlisted, onWishlist, ratingInfo }) {
           )}
         </div>
 
-        {/* FIX: Always visible full-width View Details button */}
         <Link
           to={productPath(product)}
           className="mt-auto mt-4 flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-3 text-sm font-extrabold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2"
@@ -304,7 +304,10 @@ export default function Home() {
                   data?.averageRating ?? data?.average ?? data?.rating ?? 0
                 ),
                 count: Number(
-                  data?.totalReviews ?? data?.count ?? data?.total ?? reviewList.length
+                  data?.totalReviews ??
+                    data?.count ??
+                    data?.total ??
+                    reviewList.length
                 ),
               },
             ];
@@ -391,6 +394,7 @@ export default function Home() {
   const featured = products.filter(
     (product) => product?.featured || product?.isFeatured
   );
+
   const featuredProducts = (featured.length ? featured : products).slice(0, 4);
   const newArrivals = products.slice(0, 4);
 
@@ -416,7 +420,10 @@ export default function Home() {
   const renderLoading = () => (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="animate-pulse rounded-[22px] border border-slate-100 p-2">
+        <div
+          key={index}
+          className="animate-pulse rounded-[22px] border border-slate-100 p-2"
+        >
           <div className="aspect-square rounded-[17px] bg-slate-100" />
           <div className="space-y-3 p-3">
             <div className="h-3 w-1/3 rounded bg-slate-100" />
@@ -493,13 +500,19 @@ export default function Home() {
         }
 
         .ve-float { animation: ve-float 5s ease-in-out infinite; }
+
         .ve-float-delayed {
           animation: ve-float 5.8s ease-in-out infinite;
           animation-delay: -1.8s;
         }
 
-        .ve-hero-enter { animation: ve-enter .85s cubic-bezier(.2,.8,.2,1) both; }
-        .ve-hero-enter-delay { animation: ve-enter 1s .15s cubic-bezier(.2,.8,.2,1) both; }
+        .ve-hero-enter {
+          animation: ve-enter .85s cubic-bezier(.2,.8,.2,1) both;
+        }
+
+        .ve-hero-enter-delay {
+          animation: ve-enter 1s .15s cubic-bezier(.2,.8,.2,1) both;
+        }
 
         .ve-product-card {
           box-shadow: 0 3px 12px rgba(15,23,42,.025);
@@ -523,11 +536,16 @@ export default function Home() {
         }
 
         .ve-category-icon { transition: transform 300ms ease; }
+
         .ve-category-card:hover .ve-category-icon {
           transform: rotate(-7deg) scale(1.12);
         }
 
-        .ve-glow-button { position: relative; overflow: hidden; }
+        .ve-glow-button {
+          position: relative;
+          overflow: hidden;
+        }
+
         .ve-glow-button::after {
           content: "";
           position: absolute;
@@ -539,6 +557,7 @@ export default function Home() {
           background: rgba(255,255,255,.22);
           transition: left 500ms ease;
         }
+
         .ve-glow-button:hover::after { left: 130%; }
 
         @keyframes ve-enter {
@@ -568,7 +587,11 @@ export default function Home() {
             scroll-behavior: auto !important;
             transition-duration: .01ms !important;
           }
-          .ve-reveal { opacity: 1; transform: none; }
+
+          .ve-reveal {
+            opacity: 1;
+            transform: none;
+          }
         }
       `}</style>
 
@@ -600,6 +623,7 @@ export default function Home() {
               >
                 Explore products <ArrowRight size={17} />
               </Link>
+
               <Link
                 to="/shop?category=LED%20Lights"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.06] px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10"
@@ -610,8 +634,14 @@ export default function Home() {
             </div>
 
             <div className="ve-hero-enter-delay mt-9 flex flex-wrap gap-x-6 gap-y-3 text-xs font-medium text-slate-300">
-              <span className="flex items-center gap-2"><BadgeCheck size={15} className="text-emerald-400" />Easy product discovery</span>
-              <span className="flex items-center gap-2"><Zap size={15} className="text-orange-300" />Everyday essentials</span>
+              <span className="flex items-center gap-2">
+                <BadgeCheck size={15} className="text-emerald-400" />
+                Easy product discovery
+              </span>
+              <span className="flex items-center gap-2">
+                <Zap size={15} className="text-orange-300" />
+                Everyday essentials
+              </span>
             </div>
           </div>
 
@@ -628,8 +658,12 @@ export default function Home() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent" />
                   <div className="absolute bottom-4 left-4">
-                    <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-extrabold uppercase text-white">Bright ideas</span>
-                    <p className="mt-2 text-xl font-extrabold text-white sm:text-2xl">Light every corner</p>
+                    <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-extrabold uppercase text-white">
+                      Bright ideas
+                    </span>
+                    <p className="mt-2 text-xl font-extrabold text-white sm:text-2xl">
+                      Light every corner
+                    </p>
                   </div>
                   <div className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-orange-500">
                     <Lightbulb size={20} />
@@ -645,11 +679,17 @@ export default function Home() {
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-500 hover:scale-110"
                   />
-                  <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-slate-800">LED lighting</span>
+                  <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-slate-800">
+                    LED lighting
+                  </span>
                 </div>
                 <div className="flex items-center justify-between px-1 pb-1 pt-3">
-                  <span className="text-xs font-extrabold text-slate-800 sm:text-sm">Light smarter</span>
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 text-orange-500"><ArrowUpRight size={15} /></span>
+                  <span className="text-xs font-extrabold text-slate-800 sm:text-sm">
+                    Light smarter
+                  </span>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 text-orange-500">
+                    <ArrowUpRight size={15} />
+                  </span>
                 </div>
               </div>
 
@@ -661,7 +701,9 @@ export default function Home() {
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-500 hover:scale-110"
                   />
-                  <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-extrabold text-white">Home essentials</span>
+                  <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-extrabold text-white">
+                    Home essentials
+                  </span>
                 </div>
                 <div className="flex items-center justify-between px-1 pb-1 pt-3 text-white">
                   <span className="text-xs font-extrabold sm:text-sm">Power your space</span>
@@ -674,10 +716,18 @@ export default function Home() {
 
         <div className="relative border-t border-white/10 bg-white/[0.035]">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-4 text-[11px] font-bold tracking-wide text-slate-300 sm:gap-x-12 sm:text-xs">
-            <span className="flex items-center gap-2"><Lightbulb size={15} className="text-orange-400" />LIGHTING</span>
-            <span className="flex items-center gap-2"><Zap size={15} className="text-orange-400" />ELECTRICALS</span>
-            <span className="flex items-center gap-2"><Sparkles size={15} className="text-orange-400" />HOME ESSENTIALS</span>
-            <span className="flex items-center gap-2"><ShieldCheck size={15} className="text-orange-400" />QUALITY PICKS</span>
+            <span className="flex items-center gap-2">
+              <Lightbulb size={15} className="text-orange-400" /> LIGHTING
+            </span>
+            <span className="flex items-center gap-2">
+              <Zap size={15} className="text-orange-400" /> ELECTRICALS
+            </span>
+            <span className="flex items-center gap-2">
+              <Sparkles size={15} className="text-orange-400" /> HOME ESSENTIALS
+            </span>
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={15} className="text-orange-400" /> QUALITY PICKS
+            </span>
           </div>
         </div>
       </section>
@@ -688,11 +738,19 @@ export default function Home() {
           <Reveal>
             <div className="mb-7 flex items-end justify-between gap-4 sm:mb-9">
               <div>
-                <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500">Find your essentials</p>
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Shop by category</h2>
-                <p className="mt-2 text-sm text-slate-500">Everything for your home, shop and workspace.</p>
+                <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500">
+                  Find your essentials
+                </p>
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                  Shop by category
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Everything for your home, shop and workspace.
+                </p>
               </div>
-              <Link to="/shop" className="hidden items-center gap-1 text-sm font-bold text-orange-600 sm:inline-flex">All products <ArrowRight size={16} /></Link>
+              <Link to="/shop" className="hidden items-center gap-1 text-sm font-bold text-orange-600 sm:inline-flex">
+                All products <ArrowRight size={16} />
+              </Link>
             </div>
           </Reveal>
 
@@ -703,18 +761,34 @@ export default function Home() {
                   to={`/shop?category=${encodeURIComponent(category.name)}`}
                   className="ve-category-card group block h-full rounded-[20px] border border-white bg-white p-4 shadow-sm sm:p-5"
                 >
-                  <div className={`ve-category-icon mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-[28px] ${
-                    category.color === "amber" ? "bg-amber-50" :
-                    category.color === "blue" ? "bg-blue-50" :
-                    category.color === "violet" ? "bg-violet-50" :
-                    category.color === "pink" ? "bg-pink-50" :
-                    category.color === "cyan" ? "bg-cyan-50" : "bg-orange-50"
-                  }`}>{category.icon}</div>
-                  <h3 className="text-sm font-extrabold leading-5 text-slate-800 transition group-hover:text-orange-600">{category.name}</h3>
-                  <p className="mt-1.5 min-h-[32px] text-[11px] leading-4 text-slate-500">{category.subtitle}</p>
+                  <div
+                    className={`ve-category-icon mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-[28px] ${
+                      category.color === "amber"
+                        ? "bg-amber-50"
+                        : category.color === "blue"
+                          ? "bg-blue-50"
+                          : category.color === "violet"
+                            ? "bg-violet-50"
+                            : category.color === "pink"
+                              ? "bg-pink-50"
+                              : category.color === "cyan"
+                                ? "bg-cyan-50"
+                                : "bg-orange-50"
+                    }`}
+                  >
+                    {category.icon}
+                  </div>
+                  <h3 className="text-sm font-extrabold leading-5 text-slate-800 transition group-hover:text-orange-600">
+                    {category.name}
+                  </h3>
+                  <p className="mt-1.5 min-h-[32px] text-[11px] leading-4 text-slate-500">
+                    {category.subtitle}
+                  </p>
                   <div className="mt-4 flex items-center justify-between text-[11px] font-extrabold text-orange-600">
                     Explore
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 transition group-hover:bg-orange-500 group-hover:text-white"><ArrowUpRight size={14} /></span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 transition group-hover:bg-orange-500 group-hover:text-white">
+                      <ArrowUpRight size={14} />
+                    </span>
                   </div>
                 </Link>
               </Reveal>
@@ -729,30 +803,66 @@ export default function Home() {
           <Reveal>
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500"><Sparkles size={14} />Handpicked for you</div>
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Featured products</h2>
-                <p className="mt-2 text-sm text-slate-500">Useful picks for your next electrical upgrade.</p>
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500">
+                  <Sparkles size={14} /> Handpicked for you
+                </div>
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                  Featured products
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Useful picks for your next electrical upgrade.
+                </p>
               </div>
-              <Link to="/shop" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-extrabold text-slate-700 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 sm:text-sm">View all products <ArrowRight size={15} /></Link>
+              <Link
+                to="/shop"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-extrabold text-slate-700 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 sm:text-sm"
+              >
+                View all products <ArrowRight size={15} />
+              </Link>
             </div>
           </Reveal>
 
-          {wishlistMessage && <div role="status" className="mb-5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-800">{wishlistMessage}</div>}
+          {wishlistMessage && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-800"
+            >
+              {wishlistMessage}
+            </div>
+          )}
 
-          {loading ? renderLoading() :
-            loadError ? (
-              <div className="rounded-2xl border border-rose-100 bg-rose-50 px-5 py-10 text-center">
-                <p className="text-sm font-semibold text-rose-700">{loadError}</p>
-                <button type="button" onClick={loadProducts} className="mt-4 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-500">Try again</button>
-              </div>
-            ) : featuredProducts.length ? renderProductGrid(featuredProducts) : (
-              <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center">
-                <ShoppingBag size={28} className="mx-auto text-orange-500" />
-                <h3 className="mt-4 text-lg font-extrabold text-slate-800">Products are coming soon</h3>
-                <p className="mt-2 text-sm text-slate-500">Products will appear here when available.</p>
-                <Link to="/shop" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white">Visit shop <ArrowRight size={16} /></Link>
-              </div>
-            )}
+          {loading ? (
+            renderLoading()
+          ) : loadError ? (
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-rose-700">{loadError}</p>
+              <button
+                type="button"
+                onClick={loadProducts}
+                className="mt-4 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-500"
+              >
+                Try again
+              </button>
+            </div>
+          ) : featuredProducts.length ? (
+            renderProductGrid(featuredProducts)
+          ) : (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center">
+              <ShoppingBag size={28} className="mx-auto text-orange-500" />
+              <h3 className="mt-4 text-lg font-extrabold text-slate-800">
+                Products are coming soon
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Products will appear here when available.
+              </p>
+              <Link
+                to="/shop"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white"
+              >
+                Visit shop <ArrowRight size={16} />
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -764,14 +874,28 @@ export default function Home() {
             <div className="absolute -bottom-24 right-[28%] h-52 w-52 rounded-full bg-white/10 blur-2xl" />
             <div className="relative grid items-center gap-7 px-6 py-9 sm:px-10 sm:py-12 lg:grid-cols-[1fr_auto] lg:px-14 lg:py-14">
               <div className="max-w-2xl text-white">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.17em]"><Zap size={13} />Upgrade your space</span>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-[42px]">Small upgrades.<span className="block text-orange-950/80">Big difference.</span></h2>
-                <p className="mt-3 max-w-lg text-sm leading-7 text-white/90 sm:text-base">Find the right lights, fans, switches and electrical essentials for your next project.</p>
-                <Link to="/shop" className="ve-glow-button mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-slate-800">Browse the store <ArrowRight size={17} /></Link>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.17em]">
+                  <Zap size={13} /> Upgrade your space
+                </span>
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-[42px]">
+                  Small upgrades.
+                  <span className="block text-orange-950/80">Big difference.</span>
+                </h2>
+                <p className="mt-3 max-w-lg text-sm leading-7 text-white/90 sm:text-base">
+                  Find the right lights, fans, switches and electrical essentials for your next project.
+                </p>
+                <Link
+                  to="/shop"
+                  className="ve-glow-button mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-slate-800"
+                >
+                  Browse the store <ArrowRight size={17} />
+                </Link>
               </div>
               <div className="relative hidden h-44 w-44 items-center justify-center rounded-full border border-white/30 bg-white/15 backdrop-blur-sm sm:flex lg:h-52 lg:w-52">
                 <div className="absolute inset-3 rounded-full border border-dashed border-white/50" />
-                <div className="flex h-28 w-28 items-center justify-center rounded-[32px] bg-white text-orange-500 shadow-2xl sm:h-32 sm:w-32"><Lightbulb size={65} strokeWidth={1.5} /></div>
+                <div className="flex h-28 w-28 items-center justify-center rounded-[32px] bg-white text-orange-500 shadow-2xl sm:h-32 sm:w-32">
+                  <Lightbulb size={65} strokeWidth={1.5} />
+                </div>
                 <Sparkles className="absolute right-2 top-4 text-white" size={25} />
                 <Zap className="absolute bottom-5 left-1 text-white" size={22} />
               </div>
@@ -786,18 +910,31 @@ export default function Home() {
           <Reveal>
             <div className="mb-8 flex items-end justify-between gap-4">
               <div>
-                <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500">Fresh in the store</p>
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">New arrivals</h2>
-                <p className="mt-2 text-sm text-slate-500">Recently added products in our catalogue.</p>
+                <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.2em] text-orange-500">
+                  Fresh in the store
+                </p>
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                  New arrivals
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Recently added products in our catalogue.
+                </p>
               </div>
-              <Link to="/shop" className="hidden items-center gap-1 text-sm font-bold text-orange-600 sm:inline-flex">Explore shop <ArrowRight size={16} /></Link>
+              <Link to="/shop" className="hidden items-center gap-1 text-sm font-bold text-orange-600 sm:inline-flex">
+                Explore shop <ArrowRight size={16} />
+              </Link>
             </div>
           </Reveal>
 
-          {loading ? renderLoading() :
-            newArrivals.length ? renderProductGrid(newArrivals) : (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">New arrivals will appear here when available.</div>
-            )}
+          {loading ? (
+            renderLoading()
+          ) : newArrivals.length ? (
+            renderProductGrid(newArrivals)
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+              New arrivals will appear here when available.
+            </div>
+          )}
         </div>
       </section>
 
@@ -806,21 +943,34 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
             <div className="mx-auto mb-10 max-w-2xl text-center">
-              <span className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-orange-600"><BadgeCheck size={13} />The Vishal experience</span>
-              <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Shopping made simple</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-500">A convenient place to explore electrical products for everyday needs.</p>
+              <span className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-orange-600">
+                <BadgeCheck size={13} /> The Vishal experience
+              </span>
+              <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                Shopping made simple
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">
+                A convenient place to explore electrical products for everyday needs.
+              </p>
             </div>
           </Reveal>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
             {benefits.map((benefit, index) => {
               const Icon = benefit.icon;
+
               return (
                 <Reveal key={benefit.title} delay={index * 70}>
                   <div className="group h-full rounded-[20px] border border-slate-100 bg-white p-5 transition duration-300 hover:-translate-y-1 hover:border-orange-100 hover:shadow-lg sm:p-6">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-500 transition duration-300 group-hover:-rotate-6 group-hover:bg-orange-500 group-hover:text-white"><Icon size={22} /></div>
-                    <h3 className="mt-5 text-sm font-extrabold text-slate-800">{benefit.title}</h3>
-                    <p className="mt-2 text-xs leading-6 text-slate-500">{benefit.description}</p>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-500 transition duration-300 group-hover:-rotate-6 group-hover:bg-orange-500 group-hover:text-white">
+                      <Icon size={22} />
+                    </div>
+                    <h3 className="mt-5 text-sm font-extrabold text-slate-800">
+                      {benefit.title}
+                    </h3>
+                    <p className="mt-2 text-xs leading-6 text-slate-500">
+                      {benefit.description}
+                    </p>
                   </div>
                 </Reveal>
               );
@@ -834,16 +984,30 @@ export default function Home() {
         <Reveal>
           <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 rounded-[26px] border border-slate-100 bg-[#f8fafc] px-6 py-8 sm:flex-row sm:items-center sm:px-9 sm:py-9">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-orange-400"><ShoppingBag size={23} /></div>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-orange-400">
+                <ShoppingBag size={23} />
+              </div>
               <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Ready to find what you need?</h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Explore our categories and find the right product for your home, shop or next project.</p>
+                <h2 className="text-xl font-black tracking-tight text-slate-900">
+                  Ready to find what you need?
+                </h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                  Explore our categories and find the right product for your home, shop or next project.
+                </p>
               </div>
             </div>
-            <Link to="/shop" className="ve-glow-button inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-orange-600">Start shopping <ArrowRight size={17} /></Link>
+            <Link
+              to="/shop"
+              className="ve-glow-button inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-orange-600"
+            >
+              Start shopping <ArrowRight size={17} />
+            </Link>
           </div>
         </Reveal>
       </section>
+
+      {/* WHATSAPP HELP & SUPPORT */}
+      <WhatsAppSupport />
     </main>
   );
 }
