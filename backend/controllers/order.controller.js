@@ -6,6 +6,41 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import Product from "../models/Product.js";
 import Order from "../models/order.model.js";
 
+const ALLOWED_PINCODE = "471105";
+
+const LOCATION_DELIVERY_CHARGES = {
+  Ghoora: { cod: 20, online: 5 },
+  Bamitha: { cod: 15, online: 5 },
+  Khaeri: { cod: 25, online: 10 },
+  Peera: { cod: 20, online: 5 },
+  KisorGanj: { cod: 25, online: 10 },
+  RajaPurwa: { cod: 20, online: 5 },
+  Saddupura: { cod: 30, online: 10 },
+  Maghguwa: { cod: 30, online: 10 },
+};
+
+const normalizeDeliveryLocation = (city, pincode) => {
+  if (String(pincode || "").trim() !== ALLOWED_PINCODE) {
+    return null;
+  }
+
+  const enteredCity = String(city || "").trim().toLowerCase();
+
+  return (
+    Object.keys(LOCATION_DELIVERY_CHARGES).find(
+      (location) => location.toLowerCase() === enteredCity
+    ) || null
+  );
+};
+
+const getDeliveryCharge = (city, pincode, paymentMethod) => {
+  const location = normalizeDeliveryLocation(city, pincode);
+
+  if (!location) return null;
+
+  return LOCATION_DELIVERY_CHARGES[location][paymentMethod] ?? null;
+};
+
 const formatImage = (product) => {
   const firstImage = product.images?.[0];
 
@@ -16,7 +51,6 @@ const formatImage = (product) => {
 const generateOrderNumber = () =>
   `VE${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
 
-// Use the ID created by the protect middleware.
 const getAuthenticatedUserId = (req) => {
   const rawId = req.user?.id || req.user?._id;
 
@@ -145,7 +179,20 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Merge duplicate product IDs and validate quantities.
+    // Validate location and PIN before any stock reservation or payment.
+    const deliveryCity = normalizeDeliveryLocation(
+      shippingAddress.city,
+      pincode
+    );
+
+    if (!deliveryCity) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Delivery is available only in Ghoora, Bamitha, Khaeri, Peera, KisorGanj, RajaPurwa, Saddupura and Maghguwa with PIN code 471105.",
+      });
+    }
+
     const quantityMap = new Map();
 
     for (const item of items) {
@@ -233,7 +280,21 @@ export const createOrder = async (req, res) => {
 
     subtotal = Math.round(subtotal * 100) / 100;
 
-    const deliveryCharge = 0;
+    // Calculate delivery on the server for BOTH payment methods.
+    // Never trust the frontend's deliveryCharge or totalAmount.
+    const deliveryCharge = getDeliveryCharge(
+      deliveryCity,
+      pincode,
+      paymentMethod
+    );
+
+    if (deliveryCharge === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid delivery location or payment method.",
+      });
+    }
+
     const totalAmount =
       Math.round((subtotal + deliveryCharge) * 100) / 100;
 
@@ -282,16 +343,15 @@ export const createOrder = async (req, res) => {
         notes: {
           store: "Vishal Electricals",
           customerId: String(userId),
+          deliveryLocation: deliveryCity,
+          deliveryCharge: String(deliveryCharge),
         },
       });
     }
 
     savedOrder = new Order({
       orderNumber: generateOrderNumber(),
-
-      // Always associate this order with the authenticated account.
       user: userId,
-
       items: orderItems,
       shippingAddress: {
         fullName: shippingAddress.fullName.trim(),
@@ -301,7 +361,7 @@ export const createOrder = async (req, res) => {
             ? shippingAddress.email.trim().toLowerCase()
             : "",
         address: shippingAddress.address.trim(),
-        city: shippingAddress.city.trim(),
+        city: deliveryCity,
         state: shippingAddress.state.trim(),
         pincode,
       },
@@ -326,7 +386,15 @@ export const createOrder = async (req, res) => {
       "Order created:",
       savedOrder.orderNumber,
       "Customer:",
-      String(savedOrder.user)
+      String(savedOrder.user),
+      "Location:",
+      deliveryCity,
+      "Payment:",
+      paymentMethod,
+      "Delivery charge:",
+      deliveryCharge,
+      "Total:",
+      totalAmount
     );
 
     return res.status(201).json({
@@ -469,6 +537,17 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
+    if (
+      order.orderStatus === "cancelled" ||
+      order.paymentStatus === "failed"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This order has been cancelled. Please contact support if money was deducted.",
+      });
+    }
+
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!keySecret) {
@@ -523,6 +602,7 @@ export const verifyPayment = async (req, res) => {
         user: userId,
         paymentMethod: "online",
         paymentStatus: "pending",
+        orderStatus: { $ne: "cancelled" },
         razorpayOrderId: razorpay_order_id,
       },
       {
@@ -623,15 +703,17 @@ export const cancelOnlineOrder = async (req, res) => {
       });
     }
 
-    order.orderStatus = "cancelled";
-    order.paymentStatus = "failed";
-
     if (!order.inventoryRestored) {
+      order.orderStatus = "cancelled";
+      order.paymentStatus = "failed";
       order.inventoryRestored = true;
+
       await order.save();
 
       await restoreStock(order.stockReservations || []);
     } else {
+      order.orderStatus = "cancelled";
+      order.paymentStatus = "failed";
       await order.save();
     }
 

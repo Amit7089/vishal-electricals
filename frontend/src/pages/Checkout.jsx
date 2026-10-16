@@ -20,6 +20,32 @@ import { toast } from "sonner";
 import api from "../services/api";
 import { useCart } from "../context/CartContext";
 
+const ALLOWED_PINCODE = "471105";
+
+const ALLOWED_LOCATIONS = [
+  "Ghoora",
+  "Bamitha",
+  "Khaeri",
+  "Peera",
+  "KisorGanj",
+  "RajaPurwa",
+  "Saddupura",
+  "Maghguwa",
+];
+
+// Delivery charges in rupees.
+// COD and online payment have separate charges.
+const DELIVERY_CHARGES = {
+  Ghoora: { cod: 20, online: 5 },
+  Bamitha: { cod: 15, online: 5 },
+  Khaeri: { cod: 25, online: 10 },
+  Peera: { cod: 20, online: 5 },
+  KisorGanj: { cod: 25, online: 10 },
+  RajaPurwa: { cod: 20, online: 5 },
+  Saddupura: { cod: 30, online: 10 },
+  Maghguwa: { cod: 30, online: 10 },
+};
+
 const initialForm = {
   fullName: "",
   phone: "",
@@ -27,7 +53,7 @@ const initialForm = {
   address: "",
   city: "",
   state: "Madhya Pradesh",
-  pincode: "",
+  pincode: ALLOWED_PINCODE,
 };
 
 const formatPrice = (value) =>
@@ -37,15 +63,28 @@ const formatPrice = (value) =>
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 
-// COD delivery charges based on cart subtotal.
-const getCodDeliveryCharge = (amount) => {
-  const subtotal = Number(amount) || 0;
+const getDeliveryCharge = (city, paymentMethod) => {
+  const normalizedCity = String(city || "").trim().toLowerCase();
 
-  if (subtotal < 50) return 20;
-  if (subtotal < 100) return 15;
-  if (subtotal < 500) return 10;
+  const matchedLocation = ALLOWED_LOCATIONS.find(
+    (location) => location.toLowerCase() === normalizedCity
+  );
 
-  return 5;
+  if (!matchedLocation) return 0;
+
+  return DELIVERY_CHARGES[matchedLocation]?.[paymentMethod] ?? 0;
+};
+
+const isDeliveryLocationAllowed = (city, pincode) => {
+  const normalizedCity = String(city || "").trim().toLowerCase();
+  const normalizedPincode = String(pincode || "").trim();
+
+  return (
+    normalizedPincode === ALLOWED_PINCODE &&
+    ALLOWED_LOCATIONS.some(
+      (location) => location.toLowerCase() === normalizedCity
+    )
+  );
 };
 
 function getProductImage(product) {
@@ -64,8 +103,7 @@ function loadRazorpayScript() {
       return;
     }
 
-    const scriptUrl =
-      "https://checkout.razorpay.com/v1/checkout.js";
+    const scriptUrl = "https://checkout.razorpay.com/v1/checkout.js";
 
     const existingScript = document.querySelector(
       `script[src="${scriptUrl}"]`
@@ -116,12 +154,14 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [submitting, setSubmitting] = useState(false);
 
-  // COD gets a slab-based delivery charge.
-  // Online payment has free delivery.
-  const deliveryCharge =
-    paymentMethod === "cod"
-      ? getCodDeliveryCharge(cartTotal)
-      : 0;
+  const deliveryAvailable = isDeliveryLocationAllowed(
+    form.city,
+    form.pincode
+  );
+
+  const deliveryCharge = deliveryAvailable
+    ? getDeliveryCharge(form.city, paymentMethod)
+    : 0;
 
   const grandTotal =
     (Number(cartTotal) || 0) + deliveryCharge;
@@ -148,15 +188,26 @@ export default function Checkout() {
       throw new Error("Enter a valid 6-digit PIN code.");
     }
 
+    if (!deliveryAvailable) {
+      throw new Error(
+        "Delivery is available only in approved locations with PIN code 471105."
+      );
+    }
+
     if (
       !form.fullName.trim() ||
       !form.address.trim() ||
       !form.city.trim() ||
       !form.state.trim()
     ) {
-      throw new Error(
-        "Please complete all required delivery details."
-      );
+      throw new Error("Please complete all required delivery details.");
+    }
+
+    if (
+      form.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    ) {
+      throw new Error("Enter a valid email address.");
     }
 
     return {
@@ -295,8 +346,15 @@ export default function Checkout() {
 
     if (submitting) return;
 
-    // Check login only when the user tries to place an order.
-    // Guests can still view the Checkout page.
+    let checkoutData;
+
+    try {
+      checkoutData = getCheckoutData();
+    } catch (error) {
+      toast.error(error.message || "Please check your delivery details.");
+      return;
+    }
+
     try {
       await api.get("/auth/me");
     } catch (authError) {
@@ -304,11 +362,9 @@ export default function Checkout() {
         authError.response?.status === 401 ||
         authError.response?.status === 403
       ) {
-        toast.error("Please login first");
+        toast.error("Please login first.");
       } else {
-        toast.error(
-          "Unable to verify login. Please try again."
-        );
+        toast.error("Unable to verify login. Please try again.");
       }
 
       return;
@@ -317,8 +373,6 @@ export default function Checkout() {
     let keepSubmitting = false;
 
     try {
-      const checkoutData = getCheckoutData();
-
       setSubmitting(true);
 
       if (paymentMethod === "online") {
@@ -331,38 +385,35 @@ export default function Checkout() {
         }
       }
 
-      // The backend must independently calculate and validate
-      // the final order amount and delivery charge.
+      // The backend must calculate the final delivery charge,
+      // product prices and order total independently.
       const response = await api.post("/orders", {
         ...checkoutData,
         paymentMethod,
       });
 
-      if (
-        !response.data?.success ||
-        !response.data?.order?._id
-      ) {
+      if (!response.data?.success || !response.data?.order?._id) {
         throw new Error(
-          response.data?.message ||
-            "Order could not be created."
+          response.data?.message || "Order could not be created."
         );
       }
 
       const order = response.data.order;
 
+      if (paymentMethod === "cod") {
+        finishOrder(order);
+        return;
+      }
+
       if (
-        paymentMethod === "cod" ||
-        order.paymentStatus === "paid"
+        order.paymentStatus === "paid" &&
+        order.paymentMethod === "online"
       ) {
         finishOrder(order);
         return;
       }
 
-      openRazorpayCheckout(
-        order,
-        response.data.razorpay
-      );
-
+      openRazorpayCheckout(order, response.data.razorpay);
       keepSubmitting = true;
     } catch (error) {
       console.error("Checkout error:", error);
@@ -371,7 +422,7 @@ export default function Checkout() {
         error.response?.status === 401 ||
         error.response?.status === 403
       ) {
-        toast.error("Please login first");
+        toast.error("Please login first.");
         return;
       }
 
@@ -390,18 +441,14 @@ export default function Checkout() {
   const inputClass =
     "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10";
 
-  const labelClass =
-    "block text-sm font-medium text-slate-700";
+  const labelClass = "block text-sm font-medium text-slate-700";
 
   if (cartItems.length === 0) {
     return (
       <main className="flex min-h-[65vh] items-center justify-center bg-white px-4">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 p-8 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
-            <ShoppingBag
-              size={28}
-              className="text-orange-600"
-            />
+            <ShoppingBag size={28} className="text-orange-600" />
           </div>
 
           <h1 className="mt-5 text-2xl font-bold tracking-tight text-slate-900">
@@ -444,10 +491,7 @@ export default function Checkout() {
           </Link>
 
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500 sm:text-sm">
-            <LockKeyhole
-              size={16}
-              className="text-emerald-600"
-            />
+            <LockKeyhole size={16} className="text-emerald-600" />
             Secure Checkout
           </div>
         </div>
@@ -537,7 +581,7 @@ export default function Checkout() {
                     Delivery address
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Where should we deliver your order?
+                    Delivery is currently available in selected areas only.
                   </p>
                 </div>
               </div>
@@ -558,8 +602,7 @@ export default function Checkout() {
                 </label>
 
                 <label className={labelClass}>
-                  Mobile number{" "}
-                  <span className="text-red-500">*</span>
+                  Mobile number <span className="text-red-500">*</span>
                   <input
                     name="phone"
                     type="tel"
@@ -609,17 +652,22 @@ export default function Checkout() {
                 </label>
 
                 <label className={labelClass}>
-                  City <span className="text-red-500">*</span>
-                  <input
+                  Delivery location <span className="text-red-500">*</span>
+                  <select
                     name="city"
                     value={form.city}
                     onChange={handleChange}
                     className={inputClass}
-                    placeholder="Your city"
-                    autoComplete="address-level2"
-                    maxLength={100}
                     required
-                  />
+                  >
+                    <option value="">Select your delivery area</option>
+
+                    {ALLOWED_LOCATIONS.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className={labelClass}>
@@ -651,6 +699,48 @@ export default function Checkout() {
                     required
                   />
                 </label>
+
+                <div className="sm:col-span-2 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin
+                      size={20}
+                      className="mt-0.5 shrink-0 text-orange-600"
+                    />
+
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">
+                        Delivery area verification
+                      </p>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        Delivery is available only in the approved locations
+                        with PIN code {ALLOWED_PINCODE}.
+                      </p>
+
+                      {form.city && form.pincode && (
+                        <p
+                          className={`mt-2 text-sm font-semibold ${
+                            deliveryAvailable
+                              ? "text-emerald-700"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {deliveryAvailable
+                            ? "Delivery is available at this location."
+                            : "Delivery is not available for this location or PIN code."}
+                        </p>
+                      )}
+
+                      {deliveryAvailable && (
+                        <p className="mt-1 text-sm font-semibold text-orange-700">
+                          {paymentMethod === "cod"
+                            ? `COD delivery: ${formatPrice(deliveryCharge)}`
+                            : `Online delivery: ${formatPrice(deliveryCharge)}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 sm:px-7">
@@ -688,10 +778,7 @@ export default function Checkout() {
                       : "border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  <Truck
-                    size={21}
-                    className="text-orange-600"
-                  />
+                  <Truck size={21} className="text-orange-600" />
 
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold">
@@ -700,6 +787,13 @@ export default function Checkout() {
                     <span className="mt-1 block text-xs leading-5 text-slate-500">
                       Pay when your order arrives.
                     </span>
+                    {form.city && deliveryAvailable && (
+                      <span className="mt-2 block text-xs font-semibold text-orange-700">
+                        Delivery: {formatPrice(
+                          getDeliveryCharge(form.city, "cod")
+                        )}
+                      </span>
+                    )}
                   </span>
 
                   {paymentMethod === "cod" && (
@@ -720,10 +814,7 @@ export default function Checkout() {
                       : "border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  <CreditCard
-                    size={21}
-                    className="text-slate-500"
-                  />
+                  <CreditCard size={21} className="text-slate-500" />
 
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold">
@@ -732,6 +823,13 @@ export default function Checkout() {
                     <span className="mt-1 block text-xs leading-5 text-slate-500">
                       Cards, UPI and other available methods.
                     </span>
+                    {form.city && deliveryAvailable && (
+                      <span className="mt-2 block text-xs font-semibold text-orange-700">
+                        Delivery: {formatPrice(
+                          getDeliveryCharge(form.city, "online")
+                        )}
+                      </span>
+                    )}
                   </span>
 
                   {paymentMethod === "online" && (
@@ -751,10 +849,8 @@ export default function Checkout() {
                 }`}
               >
                 {paymentMethod === "online"
-                  ? "Online payment selected. Delivery is free. Razorpay Checkout will open after you place the order."
-                  : `Cash on Delivery selected. Delivery charge: ${formatPrice(
-                      deliveryCharge
-                    )}. Pay the total amount when your order arrives.`}
+                  ? `Online payment selected. Delivery charge: ${formatPrice(deliveryCharge)}. Razorpay Checkout will open after you place the order.`
+                  : `Cash on Delivery selected. Delivery charge: ${formatPrice(deliveryCharge)}. Pay the total amount when your order arrives.`}
               </p>
             </section>
           </div>
@@ -847,23 +943,13 @@ export default function Checkout() {
                   <div className="flex justify-between gap-3 text-slate-600">
                     <span>
                       Delivery
-                      {paymentMethod === "cod" && (
-                        <span className="ml-1 text-xs text-slate-400">
-                          (COD)
-                        </span>
-                      )}
+                      <span className="ml-1 text-xs text-slate-400">
+                        ({paymentMethod === "cod" ? "COD" : "Online"})
+                      </span>
                     </span>
 
-                    <span
-                      className={`font-semibold ${
-                        deliveryCharge === 0
-                          ? "text-emerald-700"
-                          : "text-slate-900"
-                      }`}
-                    >
-                      {deliveryCharge === 0
-                        ? "Free"
-                        : formatPrice(deliveryCharge)}
+                    <span className="font-semibold text-slate-900">
+                      {formatPrice(deliveryCharge)}
                     </span>
                   </div>
                 </div>
@@ -872,13 +958,9 @@ export default function Checkout() {
 
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold">
-                      Total amount
-                    </p>
+                    <p className="text-sm font-bold">Total amount</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {paymentMethod === "cod"
-                        ? "Includes COD delivery charge"
-                        : "Includes free delivery"}
+                      Includes delivery charge
                     </p>
                   </div>
 
@@ -890,7 +972,7 @@ export default function Checkout() {
                 <button
                   type="submit"
                   form="checkout-form"
-                  disabled={submitting}
+                  disabled={submitting || !deliveryAvailable}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 focus:outline-none focus:ring-4 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting
@@ -904,6 +986,12 @@ export default function Checkout() {
                   <ArrowRight size={17} />
                 </button>
 
+                {!deliveryAvailable && (
+                  <p className="mt-3 text-center text-xs leading-5 text-red-600">
+                    Select an approved delivery location and PIN code to continue.
+                  </p>
+                )}
+
                 <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500">
                   <LockKeyhole size={14} />
                   Safe and secure checkout
@@ -913,10 +1001,7 @@ export default function Checkout() {
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                <ShieldCheck
-                  size={19}
-                  className="text-emerald-700"
-                />
+                <ShieldCheck size={19} className="text-emerald-700" />
 
                 <p className="mt-2 text-xs font-bold text-slate-800">
                   Quality products
@@ -927,10 +1012,7 @@ export default function Checkout() {
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                <Truck
-                  size={19}
-                  className="text-orange-600"
-                />
+                <Truck size={19} className="text-orange-600" />
 
                 <p className="mt-2 text-xs font-bold text-slate-800">
                   Delivery support
